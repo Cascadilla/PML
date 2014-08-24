@@ -1,0 +1,65 @@
+Analysis of Weight Lifting Exercise Dataset
+========================================================
+
+## Executive Summary
+This analysis is conducted based on the Weight Lifting Exercise Dataset provided at http://groupware.les.inf.puc-rio.br/har. The goal of this project is to  use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and then predict the manner in which they did the exercise.
+
+## Preprocessing
+First, let's load the data.
+```{r}
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+
+```
+
+Examine the structure of the dataset:
+```{r}
+str(training)
+```
+Together with other functions such as dim(), head(), summary() ... I noticed there are quite a lot of empty strings and NAs in the training dataset, so I decided to remove all those columns.
+We also should remove those columns that are not related to the classification (e.g. timestamp)
+
+```{r}
+training[training == '' | training == 'NA'] <- NA
+trainingClean <- training[,complete.cases(t(training))]
+trainingFinal <- trainingClean[,-(1:7)]
+```
+
+Now that we've cleaned the training dataset, we need to perform the same process on the testing dataset:
+```{r}
+testingClean <- testing[,names(testing) %in% names(trainingFinal)]
+```
+
+Before building our model, let's split the data into training and validation sets.
+```{r}
+library(caret)
+inTrain <- createDataPartition(y=trainingFinal$classe, p=0.75, list=FALSE)
+trainingSet <- trainingFinal[inTrain,]
+validationSet <- trainingFinal[-inTrain,]
+```
+
+
+## Model Building
+Initially, I tried to build a decision tree model. However, this accuracy is not great. As performance is not a critical requirement here, I decided to use random forests which can provide better accuracy.
+```{r}
+modelFit <- train(classe ~ ., method="rf", data=trainingSet, ntree=10, tuneLength=1)
+
+```
+
+
+## Cross Validation and Out of Sample Error
+Now let's apply the model to validation dataset to understand the out of sample error of our model.
+```{r}
+confMatrix <- confusionMatrix(validationSet$classe, predict(modelFit, newdata=validationSet))
+confMatrix
+```
+We can see the out of sample error on the validation set is rather low (<2%). Therefore, our model is relatively good.
+
+
+## Prediction
+Lets now predict using our random forests model.
+```{r}
+answers <- predict(modelFit, newdata=testingClean)
+answers
+```
+
